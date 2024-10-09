@@ -1,6 +1,8 @@
 package com.imertyildiz.grpcclient.Service;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.imertyildiz.grpcproto.HelloWorldServiceGrpc;
+import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,9 @@ public class ClientService {
 
     @GrpcClient("grpc-server")
     private HelloWorldServiceFutureStub helloWorldServiceFutureStub;
+
+    @GrpcClient("grpc-server")
+    private HelloWorldServiceGrpc.HelloWorldServiceStub helloWorldServiceStub;
 
     public void sayHello(String sender, String message) {
         HelloWorldRequest helloWorldRequest =
@@ -59,6 +64,37 @@ public class ClientService {
             }
         }, executorService);
         return completableFuture.join();//non blocking in parallel stream.
+    }
+
+    public CompletableFuture<HelloWorldResponse> sayAsyncHelloStub(String sender, String message) {
+        CompletableFuture<HelloWorldResponse> future = new CompletableFuture<>();
+                HelloWorldRequest helloWorldRequest =
+                HelloWorldRequest
+                        .newBuilder()
+                        .setClientName(sender)
+                        .setRequestMessage(message)
+                        .build();
+        StreamObserver<HelloWorldResponse> responseStreamObserver = new StreamObserver<>() {
+
+            HelloWorldResponse helloWorldResponseResult;
+            @Override
+            public void onNext(HelloWorldResponse helloWorldResponse) {
+                helloWorldResponseResult = helloWorldResponse;
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                future.completeExceptionally(throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                future.complete(helloWorldResponseResult);
+            }
+        };
+        helloWorldServiceStub.helloWorld(helloWorldRequest, responseStreamObserver);
+
+    return future;
     }
 
     public HelloWorldResponse sayHelloNonAsync(String sender, String message) {

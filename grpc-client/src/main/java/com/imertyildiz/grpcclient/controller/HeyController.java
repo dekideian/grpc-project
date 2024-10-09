@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 @RestController
 public class HeyController {
 
+    public static final int NR_OF_CALLS = 128_000;
     @Autowired
     private ClientService clientService;
 
@@ -30,8 +31,8 @@ public class HeyController {
     public Stream<String> saySmgAsync(@RequestParam("client") String client, @RequestParam("msg") String msg) {
 
         ExecutorService executorService = Executors.newFixedThreadPool(16);
-        return IntStream.generate(()->new Random().nextInt(100))
-                .limit(100)
+        return IntStream.generate(()->new Random().nextInt(NR_OF_CALLS))
+                .limit(NR_OF_CALLS)
                         .parallel()
                         .mapToObj(nr->{
                             return CompletableFuture.supplyAsync(()->clientService.sayAsyncHello(client+"_"+nr, msg+"_"+nr), executorService);
@@ -43,11 +44,24 @@ public class HeyController {
     @GetMapping("non-async")
     public Stream<String> saySmgNonAsync(@RequestParam("client") String client, @RequestParam("msg") String msg) {
 
-        return IntStream.generate(()->new Random().nextInt(100))
-                .limit(100)
+        return IntStream.generate(()->new Random().nextInt(NR_OF_CALLS))
+                .limit(NR_OF_CALLS)
                 .mapToObj(nr->{
                     HelloWorldResponse helloWorldResponse = clientService.sayHelloNonAsync(client+"_"+nr, msg+"_"+nr);
                     return helloWorldResponse.getResponseMessage();
                 });
     }
+
+    @GetMapping("async2")
+    public Stream<String> saySmgAsync2(@RequestParam("client") String client, @RequestParam("msg") String msg) {
+
+        ExecutorService executorService = Executors.newFixedThreadPool(16);
+        return IntStream.generate(()->new Random().nextInt(NR_OF_CALLS))
+                .limit(NR_OF_CALLS)
+                .parallel()
+                .mapToObj(nr->clientService.sayAsyncHelloStub(client+"_"+nr, msg+"_"+nr))
+                .map(CompletableFuture::join)
+                .map(HelloWorldResponse::getResponseMessage);
+    }
+
 }
